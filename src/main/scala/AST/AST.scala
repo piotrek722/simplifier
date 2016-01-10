@@ -6,7 +6,8 @@ object Priority {
                      "and"->3,
                      "is"->8, "<"->8, ">"->8, ">="->8, "<="->8, "=="->8, "!="->8,
                      "+"->9,  "-"->9,
-                     "*"->10, "/"->10, "%"->10)
+                     "*"->10, "/"->10, "%"->10,
+                     "**"->11   )
 
     val unary = Map("not"->4,
                     "+"->12,  "-"->12)
@@ -45,11 +46,11 @@ case class Variable(name: String) extends Node {
 case class Unary(op: String, expr: Node) extends Node {
 
     override def toStr = {
-        var str  = expr.toStr 
+        var str  = expr.toStr
         expr match {
             case e@BinExpr(_,_,_) => if(Priority.binary(e.op)<=Priority.unary(op)) { str = "(" + str + ")" }
             case e@Unary(_,_) => if(Priority.unary(e.op)<=Priority.unary(op)) { str = "(" + str + ")" }
-            case _ => 
+            case _ =>
         }
         op + " " + str
     }
@@ -59,17 +60,17 @@ case class Unary(op: String, expr: Node) extends Node {
 case class BinExpr(op: String, left: Node, right: Node) extends Node {
 
     override def toStr = {
-        var leftStr  = left.toStr 
+        var leftStr  = left.toStr
         var rightStr = right.toStr
         left match {
             case l@(_:BinExpr) => if(Priority.binary(l.op)<Priority.binary(op)) { leftStr = "(" + leftStr + ")" }
             case l@(_:Unary) => if(Priority.unary(l.op)<Priority.binary(op)) { leftStr = "(" + leftStr + ")" }
-            case _ => 
+            case _ =>
         }
         right match {
             case r@BinExpr(_,_,_) => if(Priority.binary(r.op)<Priority.binary(op)) { rightStr = "(" + rightStr + ")" }
             case r@Unary(_,_) => if(Priority.unary(r.op)<Priority.binary(op)) { rightStr = "(" + rightStr + ")" }
-            case _ => 
+            case _ =>
         }
         leftStr + " " + op + " " + rightStr
     }
@@ -113,6 +114,37 @@ case class IfElseInstr(cond: Node, left: Node, right: Node) extends Node {
     }
 }
 
+
+case class IfElifInstr(cond: Node, left: Node, elifs: List[ElifInstr]) extends Node {
+    override def toStr = {
+        var str = "if " + cond.toStr + ":\n"
+        str += left.toStr.replaceAll("(?m)^", indent)
+        for (elif <- elifs)
+            str += elif.toStr.replaceAll("(?m)^", indent)
+        str
+    }
+}
+
+case class IfElifElseInstr(cond: Node, left: Node, elifs: List[ElifInstr], right: Node) extends Node {
+    override def toStr = {
+        var str = "if " + cond.toStr + ":\n"
+        str += left.toStr.replaceAll("(?m)^", indent)
+        for (elif <- elifs)
+            str += elif.toStr.replaceAll("(?m)^", indent)
+        str += "\nelse:\n"
+        str += right.toStr.replaceAll("(?m)^", indent)
+        str
+    }
+}
+
+case class ElifInstr(cond: Node, left: Node) extends Node {
+    override def toStr = {
+        var str = "elif " + cond.toStr + ":\n"
+        str += left.toStr.replaceAll("(?m)^", indent)
+        str
+    }
+}
+
 case class WhileInstr(cond: Node, body: Node) extends Node {
     override def toStr = {
         "while " + cond.toStr + ":\n" + body.toStr.replaceAll("(?m)^", indent)
@@ -120,7 +152,7 @@ case class WhileInstr(cond: Node, body: Node) extends Node {
 }
 
 case class InputInstr() extends Node {
-    override def toStr = "input()" 
+    override def toStr = "input()"
 }
 
 case class ReturnInstr(expr: Node) extends Node {
@@ -152,14 +184,14 @@ case class FunDef(name: String, formal_args: Node, body: Node) extends Node {
 case class LambdaDef(formal_args: Node, body: Node) extends Node {
     override def toStr = "lambda " + formal_args.toStr + ": " + body.toStr
 }
-        
+
 case class ClassDef(name: String, inherit_list: Node, suite: Node) extends Node {
     override def toStr = {
         val str = "\nclass " + name
         var inheritStr = ""
         val suiteStr = ":\n" + suite.toStr.replaceAll("(?m)^", indent)
         inherit_list match {
-            case NodeList(x) => if(x.length>0) inheritStr = "(" + x.map(_.toStr).mkString("", ",", "") + ")" 
+            case NodeList(x) => if(x.length>0) inheritStr = "(" + x.map(_.toStr).mkString("", ",", "") + ")"
             case _ =>
        }
        str + inheritStr + suiteStr
@@ -191,4 +223,3 @@ case class Tuple(list: List[Node]) extends Node {
 }
 
 
-        

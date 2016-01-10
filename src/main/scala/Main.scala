@@ -1,9 +1,5 @@
 
-import java.io.FileReader
-import java.io.FileNotFoundException
-import java.io.IOException
-
-import simplifier.Simplifier
+import java.io.{FileNotFoundException, FileReader, IOException}
 
 object Main {
 
@@ -22,6 +18,7 @@ object Main {
               val reader = new FileReader(arg)
               val parseResult = parser.parseAll(reader)
               parseResult match {
+                  
                  case parser.Success(result: List[AST.Node], in) => {
                      println("\nAST:")
                      println(parseResult)
