@@ -13,6 +13,13 @@ object Simplifier {
     case list@NodeList(_) => simplifyNodeList(list)
     case unary@Unary(_,_) => simplifyUnary(unary)
     case bin@BinExpr(_,_,_) => simplifyBinary(bin)
+    case assign@Assignment(_,_) => simplifyAssignment(assign)
+    case wh@WhileInstr(_,_) => simplifyWhile(wh)
+    case singleIf@IfInstr(_,_) => simplifySingleIf(singleIf)
+    case ifElse@IfElseInstr(_,_,_) => simplifyIfElse(ifElse)
+    case ifElif@IfElifInstr(_,_,_) => simplifIfElif(ifElif)
+    case ifElifElse@IfElifElseInstr(_,_,_,_) => simplifyIfElifElse(ifElifElse)
+    case ifExpr@IfElseExpr(_,_,_) => simplifyIfExpr(ifExpr)
     case _ => node
   }
 
@@ -27,22 +34,20 @@ object Simplifier {
 
     case (TrueConst(), "not") => FalseConst()
     case (FalseConst(), "not") => TrueConst()
+
     case (u@Unary("not",_), "not" ) => u.expr
     case (u@Unary("+",_), "+" ) => u.expr
     case (u@Unary("-",_), "-" ) => u.expr
-    case (b@BinExpr(_,_,_),"not") if b.op == "==" => simplify(BinExpr("!=",b.left,b.right))
-    case (b@BinExpr(_,_,_),"not") if b.op == "!=" => simplify(BinExpr("==",b.left,b.right))
-    case (b@BinExpr(_,_,_),"not") if b.op == "<=" => simplify(BinExpr(">",b.left,b.right))
-    case (b@BinExpr(_,_,_),"not") if b.op == ">=" => simplify(BinExpr("<",b.left,b.right))
-    case (b@BinExpr(_,_,_),"not") if b.op == "<" => simplify(BinExpr(">=",b.left,b.right))
-    case (b@BinExpr(_,_,_),"not") if b.op == ">" => simplify(BinExpr("<=",b.left,b.right))
+
+    case (b@BinExpr("==",_,_),"not") => simplify(BinExpr("!=",b.left,b.right))
+    case (b@BinExpr("!=",_,_),"not") => simplify(BinExpr("==",b.left,b.right))
+    case (b@BinExpr("<=",_,_),"not") => simplify(BinExpr(">",b.left,b.right))
+    case (b@BinExpr(">=",_,_),"not") => simplify(BinExpr("<",b.left,b.right))
+    case (b@BinExpr("<",_,_),"not") => simplify(BinExpr(">=",b.left,b.right))
+    case (b@BinExpr(">",_,_),"not") => simplify(BinExpr("<=",b.left,b.right))
+
     case _ => Unary(unary.op, simplify(unary.expr))
   }
-
-  /*
-    val unary = Map("not"->4,
-                  "+"->12,  "-"->12)
- */
 
   def simplifyBinary(bin: BinExpr): Node =  (simplify(bin.left), simplify(bin.right), bin.op)  match {
 
@@ -50,25 +55,25 @@ object Simplifier {
     case (n@IntNum(_), m@IntNum(_), "-") => IntNum(n.value - m.value)
     case (n@IntNum(_), m@IntNum(_), "*") => IntNum(n.value * m.value)
     case (n@IntNum(_), m@IntNum(_), "/") if m.value != 0 => FloatNum(n.value / m.value)
-    case (n@IntNum(_), m@IntNum(_), "%") => IntNum(n.value % m.value)
+    case (n@IntNum(_), m@IntNum(_), "%") if m.value != 0 => IntNum(n.value % m.value)
 
     case (n@FloatNum(_), m@FloatNum(_), "+") => FloatNum(n.value + m.value)
     case (n@FloatNum(_), m@FloatNum(_), "-") => FloatNum(n.value - m.value)
     case (n@FloatNum(_), m@FloatNum(_), "*") => FloatNum(n.value * m.value)
-    case (n@FloatNum(_), m@FloatNum(_), "/")  if m.value != 0 => FloatNum(n.value / m.value)
-    case (n@FloatNum(_), m@FloatNum(_), "%") => FloatNum(n.value % m.value)
+    case (n@FloatNum(_), m@FloatNum(_), "/") if m.value != 0 => FloatNum(n.value / m.value)
+    case (n@FloatNum(_), m@FloatNum(_), "%") if m.value != 0 => FloatNum(n.value % m.value)
 
     case (n@IntNum(_), m@FloatNum(_), "+") => FloatNum(n.value + m.value)
     case (n@IntNum(_), m@FloatNum(_), "-") => FloatNum(n.value - m.value)
     case (n@IntNum(_), m@FloatNum(_), "*") => FloatNum(n.value * m.value)
-    case (n@IntNum(_), m@FloatNum(_), "/")  if m.value != 0 => FloatNum(n.value / m.value)
-    case (n@IntNum(_), m@FloatNum(_), "%") => FloatNum(n.value % m.value)
+    case (n@IntNum(_), m@FloatNum(_), "/") if m.value != 0 => FloatNum(n.value / m.value)
+    case (n@IntNum(_), m@FloatNum(_), "%") if m.value != 0 => FloatNum(n.value % m.value)
 
     case (n@FloatNum(_), m@FloatNum(_), "+") => FloatNum(n.value + m.value)
     case (n@FloatNum(_), m@FloatNum(_), "-") => FloatNum(n.value - m.value)
     case (n@FloatNum(_), m@FloatNum(_), "*") => FloatNum(n.value * m.value)
-    case (n@FloatNum(_), m@FloatNum(_), "/")  if m.value != 0 => FloatNum(n.value / m.value)
-    case (n@FloatNum(_), m@FloatNum(_), "%") => FloatNum(n.value % m.value)
+    case (n@FloatNum(_), m@FloatNum(_), "/") if m.value != 0 => FloatNum(n.value / m.value)
+    case (n@FloatNum(_), m@FloatNum(_), "%") if m.value != 0 => FloatNum(n.value % m.value)
 
     case (v@Variable(_),x@Variable(_),"=="|">="|"<=") if v.name == x.name => TrueConst()
     case (v@Variable(_),x@Variable(_),"!="|"<"|">") if v.name == x.name => FalseConst()
@@ -99,20 +104,87 @@ object Simplifier {
     case (v@Variable(_),TrueConst(),"and") => v
     case (TrueConst(),v@Variable(_),"and") => v
 
-
     case (u@Unary("-",_),v@_,"+") => simplify(BinExpr("-",v,u.expr))
 
     case (a@Tuple(_),b@Tuple(_),"+") => Tuple(a.list ++ b.list)
     case (a@ElemList(_),b@ElemList(_),"+") => ElemList(a.list ++ b.list)
 
-    case (v@_,u@_,o@_) => BinExpr(o, v, u)
+    case (l@_,r@_,o@_) => BinExpr(o, simplify(l), simplify(r) )
 
   }
 
+  def simplifyAssignment(assign: Assignment): Node = (simplify(assign.left), simplify(assign.right)) match {
 
+    case (x@_,y@_) if x == y => null
+    case (x@_,y@_) => Assignment(simplify(x),simplify(y))
 
+  }
+
+  def simplifyWhile(wh: WhileInstr): Node = simplify(wh.cond) match {
+
+    case FalseConst() => null;
+    case _ => WhileInstr(simplify(wh.cond), simplify(wh.body))
+
+  }
+
+  def simplifySingleIf(singleIf: IfInstr): Node = simplify(singleIf.cond) match{
+
+    case FalseConst() => null
+    case _ => IfInstr(simplify(singleIf.cond), simplify(singleIf.left))
+
+  }
+
+  def simplifyIfElse(ifElse: IfElseInstr): Node =  simplify(ifElse.cond) match{
+
+    case TrueConst() => simplify(ifElse.left)
+    case FalseConst() => simplify(ifElse.right)
+    case _ => IfElseInstr(simplify(ifElse.cond),simplify(ifElse.left), simplify(ifElse.right))
+
+  }
+
+  def simplifIfElif(ifElif: IfElifInstr): Node = simplify(ifElif.cond) match {
+
+    case TrueConst() => simplify(ifElif.left)
+
+    case FalseConst() if ifElif.elifs.size == 1 =>
+      IfInstr(simplify(ifElif.elifs.head.cond), simplify(ifElif.elifs.head.left))
+
+    case FalseConst() if ifElif.elifs.size > 1 =>
+      simplify(IfElifInstr(ifElif.elifs.head.cond, ifElif.elifs.head.left, ifElif.elifs.slice(1, ifElif.elifs.size)))
+
+    case _ => IfElifInstr(simplify(ifElif.cond),simplify(ifElif.left), ifElif.elifs)
+
+  }
+
+  def simplifyIfElifElse(ifElifElse: IfElifElseInstr): Node = simplify(ifElifElse.cond) match {
+
+    case TrueConst() => simplify(ifElifElse.left)
+
+    case FalseConst() if ifElifElse.elifs.size == 1 =>
+      IfInstr(simplify(ifElifElse.elifs.head.cond),simplify(ifElifElse.elifs.head.left))
+
+    case FalseConst() if ifElifElse.elifs.size > 1 =>
+      simplify(IfElifElseInstr(
+        ifElifElse.elifs.head.cond,
+        ifElifElse.elifs.head.left,
+        ifElifElse.elifs.slice(1, ifElifElse.elifs.size),
+        ifElifElse.right)
+      )
+
+    case _ => IfElifElseInstr(simplify(ifElifElse.cond), simplify(ifElifElse.left), ifElifElse.elifs, simplify(ifElifElse.right))
+
+  }
+
+  def simplifyIfExpr(ifExpr: IfElseExpr): Node = simplify(ifExpr.cond) match {
+
+    case FalseConst() => simplify(ifExpr.right)
+    case TrueConst() => simplify(ifExpr.left)
+    case _ => IfElseExpr(simplify(ifExpr.cond), simplify(ifExpr.left), simplify(ifExpr.right))
+
+  }
 
 }
+
 
 
 /*
