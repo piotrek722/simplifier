@@ -84,7 +84,7 @@ object Simplifier {
     case (v@Variable(_),n@IntNum(_),"*") if n.value == 0 => IntNum(0)
     case (n@IntNum(_),v@Variable(_),"*") if n.value == 0 => IntNum(0)
 
-    //case (v@_,x@_,"/") if v == x => IntNum(1)
+    case (v@Variable(_),x@Variable(_),"/") if v.name == x.name => IntNum(1)
 
     case (v@Variable(_),x@Variable(_),"or") if v.name == x.name => x
     case (v@Variable(_),x@Variable(_),"and") if v.name == x.name => x
