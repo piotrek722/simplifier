@@ -1,6 +1,7 @@
 package simplifier
 
 import AST._
+import scala.math.pow
 
 // to implement
 // avoid one huge match of cases
@@ -20,11 +21,13 @@ object Simplifier {
     case ifElse@IfElseInstr(_,_,_) => simplifyIfElse(ifElse)
     case ifElif@IfElifInstr(_,_,_) => simplifIfElif(ifElif)
     case ifExpr@IfElseExpr(_,_,_) => simplifyIfExpr(ifExpr)
-    case dic@KeyDatumList(_) => simplifyDictiorany(dic)
+    case dic@KeyDatumList(_) => simplifyDictionary(dic)
     case _ => node
   }
 
   def simplifyNodeList(mylist: NodeList): Node = mylist.list match{
+
+    case List(Assignment(x1,a),Assignment(x2,b)) if x1 == x2 => simplify(NodeList(List(Assignment(x2,b))))
 
     case List(node@NodeList(_)) => simplify(node)
     case _ => NodeList(mylist.list.map(x => simplify(x)).filter(_ != null))
@@ -36,10 +39,12 @@ object Simplifier {
     case (TrueConst(), "not") => FalseConst()
     case (FalseConst(), "not") => TrueConst()
 
+      // "cancel double unary ops"
     case (u@Unary("not",_), "not" ) => u.expr
     case (u@Unary("+",_), "+" ) => u.expr
     case (u@Unary("-",_), "-" ) => u.expr
 
+      //"get rid of not before comparisons"
     case (b@BinExpr("==",_,_),"not") => simplify(BinExpr("!=",b.left,b.right))
     case (b@BinExpr("!=",_,_),"not") => simplify(BinExpr("==",b.left,b.right))
     case (b@BinExpr("<=",_,_),"not") => simplify(BinExpr(">",b.left,b.right))
@@ -52,6 +57,7 @@ object Simplifier {
 
   def simplifyBinary(bin: BinExpr): Node =  (simplify(bin.left), simplify(bin.right), bin.op)  match {
 
+      //"simplify expressions"
     case (n@IntNum(_), m@IntNum(_), "+") => IntNum(n.value + m.value)
     case (n@IntNum(_), m@IntNum(_), "-") => IntNum(n.value - m.value)
     case (n@IntNum(_), m@IntNum(_), "*") => IntNum(n.value * m.value)
@@ -91,6 +97,7 @@ object Simplifier {
     case (n@IntNum(_),v@Variable(_),"*") if n.value == 0 => IntNum(0)
 
 
+    // x*2 + x = x*(2 + 1)
     case (BinExpr("*",l@Variable(_),r@IntNum(_)),x@Variable(_),"+" | "-") if l.name == x.name =>
       simplify(BinExpr("*",l,BinExpr(bin.op,r,IntNum(1))))
 
@@ -103,22 +110,68 @@ object Simplifier {
     case (BinExpr("*",x1,y),BinExpr("*",x2,z),"+" | "-") if x1 == x2 =>
       simplify(BinExpr("*",x1,BinExpr(bin.op,y,z)))
 
-    case (BinExpr("+" ,BinExpr("*",x1,y1),BinExpr("*",x2,z1)),BinExpr("+" ,BinExpr("*",v1,y2),BinExpr("*",v2,z2)), "+") =>
+    case (BinExpr("+",BinExpr("*",x1,BinExpr("+",y1,z1)),BinExpr("*",v1,y2)),BinExpr("*",v2,z2),"+") =>
       simplify(BinExpr("*",BinExpr("+",x1,v1),BinExpr("+",y1,z1)))
 
-      /*
-      "understand distributive property of multiplication" in {
-      parseString("2*x-x") mustEqual parseString("x")
-      parseString("x*z+y*z") mustEqual parseString("(x+y)*z")
-      parseString("x*y+x*z") mustEqual parseString("x*(y+z)")
-      parseString("x*y+x*z+v*y+v*z") mustEqual parseString("(x+v)*(y+z)")
-    }
-       */
+  //  case (x@Variable(_),y@Variable(_),"/") if x.name == y.name => IntNum(1)
 
+    /*
+  "simplify division"
+    */
 
+    case (BinExpr("+",x1,BinExpr("*",y1,z1)),BinExpr("+",x2,BinExpr("*",y2,z2)),"/")
+      if x1 == x1 && y1==y2 && z1==z2 => IntNum(1)
+
+    case (BinExpr("+",x1,y1),BinExpr("+",y2,x2),"/") if x1 == x2 && y1 == y2 => IntNum(1)
+
+    case (n@IntNum(_),BinExpr("/",v@IntNum(_),x),"/") if n.value == 1 && v.value == 1 => simplify(x)
+
+    case (n@IntNum(_),BinExpr("/",v@IntNum(_),BinExpr("-",x,y)),"/") if n.value == 1 && v.value == 1 =>
+      simplify(BinExpr("-",x,y))
+
+    case (x@Variable(_),BinExpr("/",v@IntNum(_),y),"*") if v.value == 1 => simplify(BinExpr("/",x,y))
 
     case (v@Variable(_),x@Variable(_),"/") if v.name == x.name => IntNum(1)
 
+      // "understand commutativity"
+
+    case (BinExpr("+",x,n@IntNum(_)),v@Variable(_),"-") if x == v => simplify(BinExpr("+",n,BinExpr("-",x,v)))
+
+    case (BinExpr("or",a1,b1),BinExpr("or",b2,a2),"and") if a1 == a2 && b1 == b2 =>
+      simplify(BinExpr("or",a1,b1))
+
+    case (BinExpr("and",a1,b1),BinExpr("and",b2,a2),"or") if a1 == a2 && b1 == b2 =>
+      simplify(BinExpr("and",a1,b1))
+
+  //power laws
+    case (BinExpr("**",x1,y),BinExpr("**",x2,z),"*") if x1 == x2 => simplify(BinExpr("**",x1,BinExpr("+",y,z)))
+
+    case (BinExpr("**",a@IntNum(_),b@IntNum(_)),c@IntNum(_),"**") => simplify(BinExpr("**",a,simplify(BinExpr("**",b,c))))
+
+    case (x@Variable(_),z@IntNum(_),"**") if z.value == 0 => IntNum(1)
+
+    case (x@Variable(_),z@IntNum(_),"**") if z.value == 1 => simplify(x)
+
+    case (BinExpr("**",x,n),m@Variable(_),"**") => simplify(BinExpr("**",x,BinExpr("*",n,m)))
+
+    case (BinExpr("+",BinExpr("**",x1,a@IntNum(_)),BinExpr("*",BinExpr("*",b@IntNum(_),x2),y1)),BinExpr("**",y2,c@IntNum(_)),"+")
+      if x1==x2 && y1==y2 && a.value==2 && b.value==2 && c.value==2 =>
+      simplify(BinExpr("**",BinExpr("+",x1,y1),a))
+
+//    case (BinExpr("-",BinExpr("**",BinExpr("+",x1,y1),a@IntNum(_)),BinExpr("**",x2,b@IntNum(_))),BinExpr("*",BinExpr(c@IntNum(_),x3),y2),"-")
+//      if x1==x2 && x2==x3 && y1==y2 && a.value==2 && b.value==2 && c.value==2
+//      => simplify(BinExpr("**",y1,a))
+
+    //case () =>
+
+    case (a@IntNum(_),b@IntNum(_),"**") => IntNum(pow(b.value.toDouble,a.value.toDouble).intValue)
+
+    /*
+        "recognize power laws" in {
+    parseString("(x+y)**2-x**2-2*x*y") mustEqual parseString("y**2")
+    parseString("(x+y)**2-(x-y)**2") mustEqual parseString("4*x*y")
+  }
+     */
     case (v@Variable(_),x@Variable(_),"or") if v.name == x.name => x
     case (v@Variable(_),x@Variable(_),"and") if v.name == x.name => x
 
@@ -211,7 +264,7 @@ object Simplifier {
 
   }
 
-  def simplifyDictiorany(dic: KeyDatumList): Node = dic match {
+  def simplifyDictionary(dic: KeyDatumList): Node = dic match {
     case KeyDatumList(list) => KeyDatumList(list.foldLeft(Map.empty[Node, KeyDatum])(
       (map, kd) => map + (kd.key -> kd) // map[kd.key] = kd so we elemmiate duplicated
     ).toList.map(p => p._2))
