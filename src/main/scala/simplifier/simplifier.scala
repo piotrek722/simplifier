@@ -16,19 +16,20 @@ object Simplifier {
     case assign@Assignment(_,_) => simplifyAssignment(assign)
     case wh@WhileInstr(_,_) => simplifyWhile(wh)
     case singleIf@IfInstr(_,_) => simplifySingleIf(singleIf)
+    case ifElifElse@IfElifElseInstr(_,_,_,_) => simplifyIfElifElse(ifElifElse)
     case ifElse@IfElseInstr(_,_,_) => simplifyIfElse(ifElse)
     case ifElif@IfElifInstr(_,_,_) => simplifIfElif(ifElif)
-    case ifElifElse@IfElifElseInstr(_,_,_,_) => simplifyIfElifElse(ifElifElse)
     case ifExpr@IfElseExpr(_,_,_) => simplifyIfExpr(ifExpr)
+    case dic@KeyDatumList(_) => simplifyDictiorany(dic)
     case _ => node
   }
 
-  def simplifyNodeList(mylist: NodeList): Node = {
-    mylist.list match{
-      case List(node@NodeList(_)) => simplify(node)
-      case _ => new NodeList(mylist.list.map(x => simplify(x)).filter(_ != null))
-    }
+  def simplifyNodeList(mylist: NodeList): Node = mylist.list match{
+
+    case List(node@NodeList(_)) => simplify(node)
+    case _ => NodeList(mylist.list.map(x => simplify(x)).filter(_ != null))
   }
+
 
   def simplifyUnary(unary: Unary): Node = (simplify(unary.expr), unary.op) match {
 
@@ -69,11 +70,11 @@ object Simplifier {
     case (n@IntNum(_), m@FloatNum(_), "/") if m.value != 0 => FloatNum(n.value / m.value)
     case (n@IntNum(_), m@FloatNum(_), "%") if m.value != 0 => FloatNum(n.value % m.value)
 
-    case (n@FloatNum(_), m@FloatNum(_), "+") => FloatNum(n.value + m.value)
-    case (n@FloatNum(_), m@FloatNum(_), "-") => FloatNum(n.value - m.value)
-    case (n@FloatNum(_), m@FloatNum(_), "*") => FloatNum(n.value * m.value)
-    case (n@FloatNum(_), m@FloatNum(_), "/") if m.value != 0 => FloatNum(n.value / m.value)
-    case (n@FloatNum(_), m@FloatNum(_), "%") if m.value != 0 => FloatNum(n.value % m.value)
+    case (n@FloatNum(_),  m@IntNum(_), "+") => FloatNum(n.value + m.value)
+    case (n@FloatNum(_),  m@IntNum(_), "-") => FloatNum(n.value - m.value)
+    case (n@FloatNum(_),  m@IntNum(_), "*") => FloatNum(n.value * m.value)
+    case (n@FloatNum(_),  m@IntNum(_), "/") if m.value != 0 => FloatNum(n.value / m.value)
+    case (n@FloatNum(_),  m@IntNum(_), "%") if m.value != 0 => FloatNum(n.value % m.value)
 
     case (v@Variable(_),x@Variable(_),"=="|">="|"<=") if v.name == x.name => TrueConst()
     case (v@Variable(_),x@Variable(_),"!="|"<"|">") if v.name == x.name => FalseConst()
@@ -88,6 +89,33 @@ object Simplifier {
 
     case (v@Variable(_),n@IntNum(_),"*") if n.value == 0 => IntNum(0)
     case (n@IntNum(_),v@Variable(_),"*") if n.value == 0 => IntNum(0)
+
+
+    case (BinExpr("*",l@Variable(_),r@IntNum(_)),x@Variable(_),"+" | "-") if l.name == x.name =>
+      simplify(BinExpr("*",l,BinExpr(bin.op,r,IntNum(1))))
+
+    case (BinExpr("*",l@IntNum(_),r@Variable(_)),x@Variable(_),"+" | "-") if r.name == x.name =>
+      simplify(BinExpr("*",x,BinExpr(bin.op,l,IntNum(1))))
+
+    case (BinExpr("*",x,z1),BinExpr("*",y,z2),"+" | "-") if z1 == z2 =>
+      simplify(BinExpr("*",BinExpr(bin.op,x,y),z1))
+
+    case (BinExpr("*",x1,y),BinExpr("*",x2,z),"+" | "-") if x1 == x2 =>
+      simplify(BinExpr("*",x1,BinExpr(bin.op,y,z)))
+
+    case (BinExpr("+" ,BinExpr("*",x1,y1),BinExpr("*",x2,z1)),BinExpr("+" ,BinExpr("*",v1,y2),BinExpr("*",v2,z2)), "+") =>
+      simplify(BinExpr("*",BinExpr("+",x1,v1),BinExpr("+",y1,z1)))
+
+      /*
+      "understand distributive property of multiplication" in {
+      parseString("2*x-x") mustEqual parseString("x")
+      parseString("x*z+y*z") mustEqual parseString("(x+y)*z")
+      parseString("x*y+x*z") mustEqual parseString("x*(y+z)")
+      parseString("x*y+x*z+v*y+v*z") mustEqual parseString("(x+v)*(y+z)")
+    }
+       */
+
+
 
     case (v@Variable(_),x@Variable(_),"/") if v.name == x.name => IntNum(1)
 
@@ -147,10 +175,10 @@ object Simplifier {
     case TrueConst() => simplify(ifElif.left)
 
     case FalseConst() if ifElif.elifs.size == 1 =>
-      IfInstr(simplify(ifElif.elifs.head.cond), simplify(ifElif.elifs.head.left))
+      simplify(IfInstr(ifElif.elifs.head.cond, ifElif.elifs.head.left))
 
     case FalseConst() if ifElif.elifs.size > 1 =>
-      simplify(IfElifInstr(ifElif.elifs.head.cond, ifElif.elifs.head.left, ifElif.elifs.slice(1, ifElif.elifs.size)))
+      simplify(IfElifInstr(ifElif.elifs.head.cond, ifElif.elifs.head.left, ifElif.elifs.drop(1)))
 
     case _ => IfElifInstr(simplify(ifElif.cond),simplify(ifElif.left), ifElif.elifs)
 
@@ -161,15 +189,15 @@ object Simplifier {
     case TrueConst() => simplify(ifElifElse.left)
 
     case FalseConst() if ifElifElse.elifs.size == 1 =>
-      IfInstr(simplify(ifElifElse.elifs.head.cond),simplify(ifElifElse.elifs.head.left))
+      simplify(IfInstr(ifElifElse.elifs.head.cond,ifElifElse.elifs.head.left))
 
     case FalseConst() if ifElifElse.elifs.size > 1 =>
       simplify(IfElifElseInstr(
         ifElifElse.elifs.head.cond,
         ifElifElse.elifs.head.left,
-        ifElifElse.elifs.slice(1, ifElifElse.elifs.size),
-        ifElifElse.right)
-      )
+        ifElifElse.elifs.drop(1),
+        ifElifElse.right))
+
 
     case _ => IfElifElseInstr(simplify(ifElifElse.cond), simplify(ifElifElse.left), ifElifElse.elifs, simplify(ifElifElse.right))
 
@@ -182,6 +210,14 @@ object Simplifier {
     case _ => IfElseExpr(simplify(ifExpr.cond), simplify(ifExpr.left), simplify(ifExpr.right))
 
   }
+
+  def simplifyDictiorany(dic: KeyDatumList): Node = dic match {
+    case KeyDatumList(list) => KeyDatumList(list.foldLeft(Map.empty[Node, KeyDatum])(
+      (map, kd) => map + (kd.key -> kd) // map[kd.key] = kd so we elemmiate duplicated
+    ).toList.map(p => p._2))
+    case _ => dic
+  }
+
 
 }
 
