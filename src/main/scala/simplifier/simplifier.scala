@@ -158,20 +158,16 @@ object Simplifier {
       if x1==x2 && y1==y2 && a.value==2 && b.value==2 && c.value==2 =>
       simplify(BinExpr("**",BinExpr("+",x1,y1),a))
 
-//    case (BinExpr("-",BinExpr("**",BinExpr("+",x1,y1),a@IntNum(_)),BinExpr("**",x2,b@IntNum(_))),BinExpr("*",BinExpr(c@IntNum(_),x3),y2),"-")
-//      if x1==x2 && x2==x3 && y1==y2 && a.value==2 && b.value==2 && c.value==2
-//      => simplify(BinExpr("**",y1,a))
+    case (BinExpr("-",BinExpr("**",BinExpr("+",x1,y1),a@IntNum(_)),BinExpr("**",x2,b@IntNum(_))),BinExpr("*",BinExpr("*",c@IntNum(_),x3),y2),"-")
+      if x1==x2 && x2==x3 && y1==y2 && a.value==2 && b.value==2 && c.value==2
+    => simplify(BinExpr("**",y1,a))
 
-    //case () =>
+    case (BinExpr("**",BinExpr("+",x1,y1),a@IntNum(_)),BinExpr("**",BinExpr("-",x2,y2),b@IntNum(_)),"-")
+      if x1 == x2 && y1 == y2 => simplify(BinExpr("*",BinExpr("*", IntNum(a.value * b.value), x1),y1))
 
     case (a@IntNum(_),b@IntNum(_),"**") => IntNum(pow(b.value.toDouble,a.value.toDouble).intValue)
 
-    /*
-        "recognize power laws" in {
-    parseString("(x+y)**2-x**2-2*x*y") mustEqual parseString("y**2")
-    parseString("(x+y)**2-(x-y)**2") mustEqual parseString("4*x*y")
-  }
-     */
+      
     case (v@Variable(_),x@Variable(_),"or") if v.name == x.name => x
     case (v@Variable(_),x@Variable(_),"and") if v.name == x.name => x
 

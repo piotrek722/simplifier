@@ -222,5 +222,9 @@ case class Tuple(list: List[Node]) extends Node {
                          else list.map(_.toStr).mkString("(", ",", ")")
 }
 
+case class EmptyInstr() extends Node {
+    override def toStr = ""
+}
+
 
 
