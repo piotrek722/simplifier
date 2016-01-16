@@ -167,7 +167,7 @@ object Simplifier {
 
     case (a@IntNum(_),b@IntNum(_),"**") => IntNum(pow(b.value.toDouble,a.value.toDouble).intValue)
 
-      
+
     case (v@Variable(_),x@Variable(_),"or") if v.name == x.name => x
     case (v@Variable(_),x@Variable(_),"and") if v.name == x.name => x
 
