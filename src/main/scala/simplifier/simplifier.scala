@@ -3,10 +3,6 @@ package simplifier
 import AST._
 import scala.math.pow
 
-// to implement
-// avoid one huge match of cases
-// take into account non-greedy strategies to resolve cases with power laws
-//Od szczególnych do ogólnych
 object Simplifier {
 
   def simplify(node: Node): Node = node match{
@@ -97,7 +93,7 @@ object Simplifier {
     case (n@IntNum(_),v@Variable(_),"*") if n.value == 0 => IntNum(0)
 
 
-    // x*2 + x = x*(2 + 1)
+    // "understand distributive property of multiplication"
     case (BinExpr("*",l@Variable(_),r@IntNum(_)),x@Variable(_),"+" | "-") if l.name == x.name =>
       simplify(BinExpr("*",l,BinExpr(bin.op,r,IntNum(1))))
 
@@ -113,11 +109,8 @@ object Simplifier {
     case (BinExpr("+",BinExpr("*",x1,BinExpr("+",y1,z1)),BinExpr("*",v1,y2)),BinExpr("*",v2,z2),"+") =>
       simplify(BinExpr("*",BinExpr("+",x1,v1),BinExpr("+",y1,z1)))
 
-  //  case (x@Variable(_),y@Variable(_),"/") if x.name == y.name => IntNum(1)
 
-    /*
-  "simplify division"
-    */
+    //  "simplify division"
 
     case (BinExpr("+",x1,BinExpr("*",y1,z1)),BinExpr("+",x2,BinExpr("*",y2,z2)),"/")
       if x1 == x1 && y1==y2 && z1==z2 => IntNum(1)
@@ -143,7 +136,7 @@ object Simplifier {
     case (BinExpr("and",a1,b1),BinExpr("and",b2,a2),"or") if a1 == a2 && b1 == b2 =>
       simplify(BinExpr("and",a1,b1))
 
-  //power laws
+    // power laws
     case (BinExpr("**",x1,y),BinExpr("**",x2,z),"*") if x1 == x2 => simplify(BinExpr("**",x1,BinExpr("+",y,z)))
 
     case (BinExpr("**",a@IntNum(_),b@IntNum(_)),c@IntNum(_),"**") => simplify(BinExpr("**",a,simplify(BinExpr("**",b,c))))
@@ -262,34 +255,9 @@ object Simplifier {
 
   def simplifyDictionary(dic: KeyDatumList): Node = dic match {
     case KeyDatumList(list) => KeyDatumList(list.foldLeft(Map.empty[Node, KeyDatum])(
-      (map, kd) => map + (kd.key -> kd) // map[kd.key] = kd so we elemmiate duplicated
+      (map, kd) => map + (kd.key -> kd)
     ).toList.map(p => p._2))
     case _ => dic
   }
-
-
+  
 }
-
-
-
-/*
-Przykłady optymalizacji:
-
-Ewaluacja wyrażeń stałych:
-2+3*5 ⇒ 18
-Optymalizacje wykorzystujące prawa matematyczne:
-x+0 ⇒ x
-x and False ⇒ False
-x>x ⇒ False
-not x==y ⇒ x!=y
-Wykrywanie zduplikowanych kluczy w słowniku:
-{ "a": 1, "b": 2, "a": 3 } ⇒ { "a": 3, "b": 2 }
-Konkatenacja list:
-[a,b,c]+[x,y] ⇒ [a,b,c,x,y]
-Konkatenacja krotek:
-(a,b,c)+(x,y) ⇒ (a,b,c,x,y)
-Eliminacja zbędnych instrukcji:
-x=x =>
-'Peephole optimization':
-x=a; x=b => x=b
- */
